@@ -67,25 +67,35 @@ describe("collectFormats", () => {
 describe("parseReport", () => {
 	const root = "/repo";
 
+	const makeRawClone = (overrides: Record<string, unknown> = {}) => ({
+		firstFile: { name: "src/a.ts", startLoc: { line: 1 }, endLoc: { line: 5 } },
+		secondFile: { name: "src/b.ts", startLoc: { line: 1 }, endLoc: { line: 5 } },
+		lines: 5,
+		tokens: 60,
+		format: "typescript",
+		fragment: "x",
+		...overrides,
+	});
+
+	const wrapMap = (raw: unknown) => JSON.stringify({ duplicates: { "0": raw } });
+	const wrapList = (raw: unknown) => JSON.stringify({ duplicates: [raw] });
+
 	it("returns an empty array when duplicates is missing", () => {
 		expect(parseReport("{}", root)).toEqual([]);
 		expect(parseReport('{"duplicates":null}', root)).toEqual([]);
+		expect(parseReport('{"duplicates":[]}', root)).toEqual([]);
 	});
 
 	it("parses clones from an object map and strips the :format suffix", () => {
-		const json = JSON.stringify({
-			statistics: { total: { lines: 100, tokens: 500, sources: 2, clones: 1, percentage: 5 } },
-			duplicates: {
-				"0": {
-					firstFile: { name: "src/a.ts", startLoc: { line: 10 }, endLoc: { line: 25 } },
-					secondFile: { name: "src/b.ts:typescript", startLoc: { line: 50 }, endLoc: { line: 65 } },
-					lines: 16,
-					tokens: 120,
-					format: "typescript",
-					fragment: "const x = 1;\nconst y = 2;\n",
-				},
-			},
-		});
+		const json = wrapMap(
+			makeRawClone({
+				firstFile: { name: "src/a.ts", startLoc: { line: 10 }, endLoc: { line: 25 } },
+				secondFile: { name: "src/b.ts:typescript", startLoc: { line: 50 }, endLoc: { line: 65 } },
+				lines: 16,
+				tokens: 120,
+				fragment: "const x = 1;\nconst y = 2;\n",
+			}),
+		);
 		const clones = parseReport(json, root);
 		expect(clones).toHaveLength(1);
 		const c = clones[0]!;
@@ -101,55 +111,46 @@ describe("parseReport", () => {
 		expect(c.fragment).toContain("const x = 1");
 	});
 
+	it("parses clones from an array (jscpd 5.x format)", () => {
+		const json = wrapList(makeRawClone());
+		const clones = parseReport(json, root);
+		expect(clones).toHaveLength(1);
+		expect(clones[0]!.a.file).toBe("src/a.ts");
+	});
+
 	it("does not strip a suffix that does not match the format", () => {
-		const json = JSON.stringify({
-			duplicates: {
-				"0": {
-					firstFile: { name: "CHANGELOG.md", startLoc: { line: 1 }, endLoc: { line: 3 } },
-					secondFile: { name: "README.md", startLoc: { line: 5 }, endLoc: { line: 7 } },
-					format: "markdown",
-					lines: 2,
-					tokens: 60,
-					fragment: "# heading\nbody line\n",
-				},
-			},
-		});
+		const json = wrapMap(
+			makeRawClone({
+				firstFile: { name: "CHANGELOG.md", startLoc: { line: 1 }, endLoc: { line: 3 } },
+				secondFile: { name: "README.md", startLoc: { line: 5 }, endLoc: { line: 7 } },
+				format: "markdown",
+				lines: 2,
+				fragment: "# heading\nbody line\n",
+			}),
+		);
 		const clones = parseReport(json, root);
 		expect(clones[0]!.a.file).toBe("CHANGELOG.md");
 		expect(clones[0]!.b.file).toBe("README.md");
 	});
 
 	it("normalizes windows-style separators to POSIX", () => {
-		const json = JSON.stringify({
-			duplicates: {
-				"0": {
-					firstFile: { name: "src\\a.ts", startLoc: { line: 1 }, endLoc: { line: 1 } },
-					secondFile: { name: "src\\b.ts", startLoc: { line: 1 }, endLoc: { line: 1 } },
-					format: "typescript",
-					lines: 1,
-					tokens: 60,
-					fragment: "x",
-				},
-			},
-		});
+		const json = wrapMap(
+			makeRawClone({
+				firstFile: { name: "src\\a.ts", startLoc: { line: 1 }, endLoc: { line: 1 } },
+				secondFile: { name: "src\\b.ts", startLoc: { line: 1 }, endLoc: { line: 1 } },
+				lines: 1,
+				fragment: "x",
+			}),
+		);
 		const clones = parseReport(json, root);
 		expect(clones[0]!.a.file).toBe("src/a.ts");
 		expect(clones[0]!.b.file).toBe("src/b.ts");
 	});
 
 	it("drops clones that miss one of the two file names", () => {
-		const json = JSON.stringify({
-			duplicates: {
-				"0": {
-					firstFile: { name: "src/a.ts", startLoc: { line: 1 }, endLoc: { line: 1 } },
-					secondFile: { name: "", startLoc: { line: 1 }, endLoc: { line: 1 } },
-					format: "typescript",
-					lines: 1,
-					tokens: 60,
-					fragment: "x",
-				},
-			},
-		});
+		const json = wrapMap(
+			makeRawClone({ secondFile: { name: "", startLoc: { line: 1 }, endLoc: { line: 1 } } }),
+		);
 		expect(parseReport(json, root)).toEqual([]);
 	});
 });
@@ -269,18 +270,16 @@ describe("filterInvolving", () => {
 });
 
 describe("signature", () => {
+	const makeClone = (aFile: string, bFile: string): Clone => ({
+		a: { file: aFile, startLine: 1, endLine: 10 },
+		b: { file: bFile, startLine: 5, endLine: 15 },
+		lines: 10, tokens: 80, format: "typescript", fragment: "x",
+	});
+
 	it("is independent of clone order", () => {
 		const root = "/repo";
-		const c1: Clone = {
-			a: { file: "a.ts", startLine: 1, endLine: 10 },
-			b: { file: "b.ts", startLine: 5, endLine: 15 },
-			lines: 10, tokens: 80, format: "typescript", fragment: "x",
-		};
-		const c2: Clone = {
-			a: { file: "c.ts", startLine: 1, endLine: 10 },
-			b: { file: "d.ts", startLine: 5, endLine: 15 },
-			lines: 10, tokens: 80, format: "typescript", fragment: "x",
-		};
+		const c1 = makeClone("a.ts", "b.ts");
+		const c2 = makeClone("c.ts", "d.ts");
 		const r1: ScanResult = { root, clones: [c1, c2] };
 		const r2: ScanResult = { root, clones: [c2, c1] };
 		expect(signature(r1)).toBe(signature(r2));
@@ -288,11 +287,7 @@ describe("signature", () => {
 
 	it("changes when any side of any pair changes", () => {
 		const root = "/repo";
-		const base: Clone = {
-			a: { file: "a.ts", startLine: 1, endLine: 10 },
-			b: { file: "b.ts", startLine: 5, endLine: 15 },
-			lines: 10, tokens: 80, format: "typescript", fragment: "x",
-		};
+		const base = makeClone("a.ts", "b.ts");
 		const shifted: Clone = { ...base, a: { ...base.a, startLine: 2 } };
 		const r1: ScanResult = { root, clones: [base] };
 		const r2: ScanResult = { root, clones: [shifted] };
@@ -356,6 +351,15 @@ describe("formatMessage", () => {
 describe("runScan", () => {
 	const root = "/repo";
 
+	const makeRecordingExec = (killed = false) => {
+		const calls: Array<{ cmd: string; args: string[]; opts: { cwd?: string; timeout?: number } }> = [];
+		const exec: ExecFn = async (cmd, args, opts) => {
+			calls.push({ cmd, args, opts });
+			return { stdout: "", stderr: "", code: 0, killed };
+		};
+		return { exec, calls };
+	};
+
 	it("invokes npx jscpd with the right arguments and parses the report", async () => {
 		fsState.report = JSON.stringify({
 			duplicates: {
@@ -368,11 +372,7 @@ describe("runScan", () => {
 				},
 			},
 		});
-		const calls: Array<{ cmd: string; args: string[]; opts: { cwd?: string; timeout?: number } }> = [];
-		const exec: ExecFn = async (cmd, args, opts) => {
-			calls.push({ cmd, args, opts });
-			return { stdout: "", stderr: "", code: 0, killed: false };
-		};
+		const { exec, calls } = makeRecordingExec();
 		const result = await runScan(exec, {
 			cwd: root,
 			formats: ["typescript"],
@@ -396,7 +396,7 @@ describe("runScan", () => {
 	});
 
 	it("throws when jscpd is killed by the timeout", async () => {
-		const exec: ExecFn = async () => ({ stdout: "", stderr: "", code: 0, killed: true });
+		const { exec } = makeRecordingExec(true);
 		await expect(
 			runScan(exec, { cwd: root, formats: ["typescript"], minTokens: 50, timeoutMs: 1000 }),
 		).rejects.toThrow(/timed out/);
@@ -412,7 +412,7 @@ describe("runScan", () => {
 				},
 			},
 		});
-		const exec: ExecFn = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
+		const { exec } = makeRecordingExec();
 		const result = await runScan(exec, {
 			cwd: root,
 			formats: ["typescript"],

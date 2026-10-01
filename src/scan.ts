@@ -181,13 +181,11 @@ interface RawClone {
 	fragment?: string;
 }
 
-/**
- * Parses the JSON report produced by `jscpd --reporters json`.
- * The report stores clones as an object map keyed by index, not an array.
- */
 export function parseReport(json: string, root: string): Clone[] {
-	const report = JSON.parse(json) as { duplicates?: Record<string, RawClone> };
-	const raw = Object.values(report.duplicates ?? {});
+	const report = JSON.parse(json) as { duplicates?: Record<string, RawClone> | RawClone[] };
+	const raw = Array.isArray(report.duplicates)
+		? report.duplicates
+		: Object.values(report.duplicates ?? {});
 	const clones: Clone[] = [];
 	for (const c of raw) {
 		if (!c.firstFile?.name || !c.secondFile?.name) continue;
