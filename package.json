@@ -1,6 +1,6 @@
 {
   "name": "@giuseppe.trisciuoglio/pi-jscpd-duplicates",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "pi extension that keeps AI-generated code free of duplicates: an asynchronous jscpd scan runs after every file write, and the agent is asked to refactor when freshly written code duplicates existing code.",
   "keywords": [
     "pi-package",
