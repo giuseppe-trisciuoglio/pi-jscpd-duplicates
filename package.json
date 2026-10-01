@@ -1,0 +1,64 @@
+{
+  "name": "@giuseppe.trisciuoglio/pi-jscpd-duplicates",
+  "version": "0.1.0",
+  "description": "pi extension that keeps AI-generated code free of duplicates: an asynchronous jscpd scan runs after every file write, and the agent is asked to refactor when freshly written code duplicates existing code.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "jscpd",
+    "duplicate-code",
+    "copy-paste-detector",
+    "code-quality",
+    "ai-agent",
+    "refactor"
+  ],
+  "author": "Giuseppe Trisciuoglio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giuseppe-trisciuoglio/pi-jscpd-duplicates.git"
+  },
+  "bugs": {
+    "url": "https://github.com/giuseppe-trisciuoglio/pi-jscpd-duplicates/issues"
+  },
+  "homepage": "https://github.com/giuseppe-trisciuoglio/pi-jscpd-duplicates#readme",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "echo 'pi loads TypeScript extensions directly; no build step is required.'",
+    "check": "npm run typecheck",
+    "test": "npm run typecheck && npm run test:unit",
+    "test:unit": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.99.2",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
+  },
+  "pi": {
+    "name": "pi-jscpd-duplicates",
+    "displayName": "Pi jscpd Duplicates",
+    "description": "Async duplicate-code guard: jscpd runs in the background after every write, the agent refactors the freshly introduced clones before settling.",
+    "category": "developer-tools",
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}

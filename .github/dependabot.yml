@@ -1,0 +1,43 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    versioning-strategy: "increase"
+    labels:
+      - "dependencies"
+      - "enhancement"
+    groups:
+      production-peer-dependencies:
+        applies-to: version-updates
+        dependency-type: "production"
+      dev-dependencies:
+        applies-to: version-updates
+        dependency-type: "development"
+      npm-non-major:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 3
+    rebase-strategy: "auto"
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
